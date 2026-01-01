@@ -445,6 +445,18 @@ def _plot_leiden_clustering(
     sc.tl.leiden(adata, resolution = resolution, random_state = seed)
     if 'leiden_colors' in adata.uns.keys():
         adata.uns.pop('leiden_colors')
-    sq.pl.spatial_scatter(adata, color = "leiden", title = title, ax = ax)
+    try:
+        sq.pl.spatial_scatter(adata, color = "leiden", title = title, ax = ax)
+    except Exception:
+        #使用散点图，不用sc或者sq绘图
+        coords = adata.obsm["spatial"]
+        leiden_labels = adata.obs["leiden"].astype(str)
+        unique_labels = leiden_labels.unique()
+        colors = plt.cm.get_cmap('tab20', len(unique_labels))
+        for i, label in enumerate(unique_labels):
+            mask = leiden_labels == label
+            ax.scatter(coords[mask, 0], coords[mask, 1], s=20, color=colors(i), label=label)
+        ax.set_title(title if title else "Leiden Clustering")
+
 
     ax.get_legend().set_title("Leiden cluster")
