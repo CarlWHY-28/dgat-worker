@@ -1,10 +1,26 @@
 import pandas as pd
-import numpy as np
 from scipy.stats import wilcoxon
-import os
 from scipy import sparse
-import squidpy as sq
+from typing import Optional, Tuple, List, Dict, Any
 
+
+import streamlit as st
+import matplotlib.pyplot as plt
+import numpy as np
+import scanpy as sc
+import tempfile
+import os
+import sys
+import psutil
+import squidpy as sq
+import random
+from scipy import sparse as sp
+
+
+
+FIGSIZE = (4.8, 4.8)
+
+IMAGE_NA_PATH = "./logo/no_available_icon.png"
 
 def compute_moran_for_pair(pre_adata,
                            rna_adata,
@@ -201,3 +217,234 @@ def compute_bivariate_moran_single(
     except Exception as e:
         print(f"  - [{tissue_name}] Error: {e}")
         return pd.DataFrame(columns=['Tissue', 'Marker_A', 'Marker_B', 'Bivariate_Moran_I'])
+
+
+
+def _varnames(adata) -> List[str]:
+    return [str(x) for x in getattr(adata, "var_names", [])]
+
+def _to_1d_vals(adata, gene) -> np.ndarray:
+    X = adata[:, str(gene)].X
+    if sp is not None and sp.issparse(X):
+        return np.ravel(X.A)
+    return np.asarray(X).ravel()
+
+def _has_spatial_coords(adata) -> bool:
+    try:
+        return "spatial" in adata.obsm and getattr(adata.obsm["spatial"], "shape", (0, 0))[1] >= 2
+    except Exception:
+        return False
+
+def _probe_spatial_meta(adata) -> Tuple[bool, Optional[str], Optional[str], Dict[str, Any]]:
+
+    meta = {}
+    try:
+        if "spatial" not in adata.uns or not isinstance(adata.uns["spatial"], dict):
+            return False, None, None, meta
+
+        spatial_uns = adata.uns["spatial"]
+        libs = list(spatial_uns.keys())
+        if len(libs) == 0:
+            return False, None, None, meta
+        lib = libs[0]
+        lib_dict = spatial_uns.get(lib, {})
+        images_dict = lib_dict.get("images", {})
+
+        candidates = ["hires", "image", "lowres"]
+        img_key = None
+        if isinstance(images_dict, dict) and len(images_dict) > 0:
+            for k in candidates:
+                if k in images_dict:
+                    img_key = k
+                    break
+            if img_key is None:
+                img_key = list(images_dict.keys())[0]
+            return True, lib, img_key, {"libs": libs, "img_keys": list(images_dict.keys())}
+        for k in candidates:
+            if k in lib_dict:
+                return True, lib, k, {"libs": libs, "img_keys": [k]}
+
+        return False, lib, None, {"libs": libs, "img_keys": []}
+    except Exception:
+        return False, None, None, meta
+
+
+def _plot_spatial_tissue_scanpy(adata, library_id: Optional[str], img_key: Optional[str]) -> Optional[plt.Figure]:
+
+    if library_id is not None and img_key is not None:
+        try:
+            fig_obj = sc.pl.spatial(
+                adata,
+                color=None,
+                library_id=library_id,
+                img_key=img_key,
+                show=False,
+                return_fig=True,
+                figsize=FIGSIZE,
+
+            )
+            return fig_obj if fig_obj is not None else plt.gcf()
+        except Exception:
+            pass
+
+    try:
+        fig_obj = sc.pl.spatial(
+            adata,
+            color=None,
+            show=False,
+            return_fig=True,
+            figsize=FIGSIZE
+        )
+        return fig_obj if fig_obj is not None else plt.gcf()
+    except Exception:
+        return None
+
+
+def _plot_spatial_expr_scanpy(adata, gene: str, library_id: Optional[str], img_key: Optional[str]) -> Optional[plt.Figure]:
+    if library_id is None or img_key is None:
+        return None
+    try:
+        fig_obj = sc.pl.spatial(
+            adata,
+            color=str(gene),
+            library_id=library_id,
+            img_key=img_key,
+            show=False,
+            return_fig=True,
+            figsize=FIGSIZE
+        )
+        fig = fig_obj if fig_obj is not None else plt.gcf()
+        return fig
+    except Exception:
+        return None
+
+def _plot_scatter_expr(adata, gene: Optional[str]) -> plt.Figure:
+    fig = plt.figure(figsize=FIGSIZE)
+    if not _has_spatial_coords(adata) or gene is None or str(gene) not in _varnames(adata):
+        plt.axis("off")
+        plt.text(0.5, 0.5, "NA", ha="center", va="center", fontsize=16)
+        return fig
+
+    coords = adata.obsm["spatial"]
+    vals = _to_1d_vals(adata, gene)
+    sca = plt.scatter(coords[:, 0], coords[:, 1], s=20, c=vals)
+    #plt.gca().invert_yaxis()
+    plt.xticks([]); plt.yticks([])
+    plt.colorbar(sca, shrink=0.75).set_label(str(gene))
+    return fig
+
+def _plot_image_placeholder(img_path: str) -> plt.Figure:
+    fig = plt.figure(figsize=FIGSIZE)
+    try:
+        img = plt.imread(img_path)
+        plt.imshow(img)
+        plt.axis("off")
+    except Exception:
+        plt.axis("off")
+        plt.text(0.5, 0.5, "NA", ha="center", va="center", fontsize=16)
+    return fig
+
+
+def _plot_tissue_only(adata, library_id: Optional[str], img_key: Optional[str]) -> plt.Figure:
+    fig, ax = plt.subplots(figsize=FIGSIZE, dpi=100)
+    try:
+        if library_id and img_key:
+            sc.pl.spatial(
+                adata,
+                color=None,
+                library_id=library_id,
+                img_key=img_key,
+                show=False,
+                ax=ax
+            )
+        else:
+            sc.pl.spatial(adata, color=None, show=False, ax=ax)
+        ax.set_xlim(ax.get_xlim())
+        ax.set_ylim(ax.get_ylim())
+        ax.set_aspect('equal', adjustable='box')
+        plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+        return fig
+    except Exception:
+        plt.close(fig)
+
+    # fallback: NA
+    fig, ax = plt.subplots(figsize=FIGSIZE, dpi=100)
+    ax.axis("off")
+    ax.text(0.5, 0.5, "No tissue image", ha="center", va="center", fontsize=14, transform=ax.transAxes)
+    return fig
+
+def _plot_spatial_expr_mrna(adata, gene: Optional[str], library_id: Optional[str], img_key: Optional[str]) -> plt.Figure:
+    fig, ax = plt.subplots(figsize=FIGSIZE, dpi=100)
+    if gene is None or str(gene) not in _varnames(adata):
+        ax.axis("off")
+        ax.text(0.5, 0.5, "NA", ha="center", va="center", fontsize=16, transform=ax.transAxes)
+        return fig
+
+    if library_id and img_key:
+        try:
+            sc.pl.spatial(
+                adata,
+                color=str(gene),
+                library_id=library_id,
+                img_key=img_key,
+                show=False,
+                ax=ax,
+                size=1.7,
+                cmap="viridis"   # ⭐ 新增：mRNA 用 viridis
+            )
+            ax.set_xlim(ax.get_xlim())
+            ax.set_ylim(ax.get_ylim())
+            ax.set_aspect('equal', adjustable='box')
+            plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+            return fig
+        except Exception:
+            plt.close(fig)
+
+    return _plot_scatter_expr(adata, gene)
+
+
+def _plot_spatial_expr(adata, gene: Optional[str], library_id: Optional[str], img_key: Optional[str]) -> plt.Figure:
+    fig, ax = plt.subplots(figsize=FIGSIZE, dpi=100)
+    if gene is None or str(gene) not in _varnames(adata):
+        ax.axis("off")
+        ax.text(0.5, 0.5, "NA", ha="center", va="center", fontsize=16, transform=ax.transAxes)
+        return fig
+
+    if library_id and img_key:
+        try:
+            sc.pl.spatial(
+                adata,
+                color=str(gene),
+                library_id=library_id,
+                img_key=img_key,
+                show=False,
+                ax=ax,
+                size=1.7,
+                cmap="plasma"   # ⭐ 新增：protein 用 plasma
+            )
+            ax.set_xlim(ax.get_xlim())
+            ax.set_ylim(ax.get_ylim())
+            ax.set_aspect('equal', adjustable='box')
+            plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+            return fig
+        except Exception:
+            plt.close(fig)
+
+    # fallback scatter
+    return _plot_scatter_expr(adata, gene)
+
+def _plot_leiden_clustering(
+    adata,
+    ax,
+    n_neighbors = 10,
+    resolution = 0.5,
+    title = None,
+    seed = 0
+    ):
+    sc.pp.neighbors(adata, n_neighbors = n_neighbors, use_rep = 'X', random_state = seed)
+    sc.tl.leiden(adata, resolution = resolution, random_state = seed)
+    if 'leiden_colors' in adata.uns.keys():
+        adata.uns.pop('leiden_colors')
+    sq.pl.spatial_scatter(adata, color = "leiden", title = title, ax = ax)
+
+    ax.get_legend().set_title("Leiden cluster")

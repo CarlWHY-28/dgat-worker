@@ -55,8 +55,13 @@ def send_notification(email, code, success=True, note = ''):
     msg['To'] = email
 
     try:
-        with smtplib.SMTP_SSL(os.getenv("SMTP_SERVER"), int(os.getenv("SMTP_PORT", 587))) as server:
-            server.login(os.getenv("SMTP_USER"), os.getenv("SMTP_PASS"))
-            server.send_message(msg)
+        # 1. 使用 587 端口建立普通 SMTP 连接
+        server = smtplib.SMTP('smtp.gmail.com', 587, timeout=30)
+        # 2. 将连接升级为加密连接 (必须)
+        server.starttls()
+        # 3. 登录并发送
+        server.login('carlwanghy@gmail.com', 'oilucthfcbwrykjf')
+        server.send_message(msg)
+        server.quit()
     except Exception as e:
         print(f"Mail Error: {e}")

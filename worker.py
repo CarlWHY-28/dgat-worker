@@ -2,10 +2,29 @@ import time
 import os
 import anndata as ad
 from datetime import datetime, timedelta
+
+import requests
+
 from task_manager import Session, ProteinTask, get_s3_client, send_notification
 from dgat_utils.predict_util import web_predict
 
+from dgat_utils.downstream import _plot_leiden_clustering, _plot_spatial_expr, _plot_spatial_expr_mrna, _plot_tissue_only, _plot_image_placeholder, IMAGE_NA_PATH
+
+import matplotlib
+matplotlib.use('Agg') # 必须在导入 pyplot 之前
+import matplotlib.pyplot as plt
+import io
+
 URL_REPO = 'https://raw.githubusercontent.com/CarlWHY-28/DGAT-web-resource/main'
+protein_names = requests.get(f"{URL_REPO}/common_protein_31.txt").text.strip().splitlines()
+
+def save_plot_to_s3(fig, s3_client, bucket, key):
+    """将 Matplotlib 图表直接上传至 S3，不产生本地文件"""
+    img_data = io.BytesIO()
+    fig.savefig(img_data, format='png', bbox_inches='tight', dpi=100)
+    img_data.seek(0)
+    s3_client.upload_fileobj(img_data, bucket, key, ExtraArgs={'ContentType': 'image/png'})
+    plt.close(fig)
 
 
 def cleanup_old_tasks():
@@ -19,8 +38,6 @@ def cleanup_old_tasks():
 
     # !!!!!!!!现在是测试所以是1 ！！！！！！************************
     threshold_time = datetime.utcnow() - timedelta(hours=12)
-
-
 
 
     # 2. 查询过期的任务
@@ -90,13 +107,50 @@ def run_worker():
                 adata_in = ad.read_h5ad(local_in)
                 adata_out = web_predict(URL_REPO, adata_in)
 
+                s3 = get_s3_client()
+                bucket = os.getenv("BUCKET_NAME")
+                plot_prefix = f"task_{task.feature_code}/spatial_plots"
+
+                print(f"Generating plots for {task.feature_code}...")
+
+                # 4.1 绘制 Tissue 基准图
+                fig_tissue = _plot_tissue_only(adata_out, None, None)  # 使用你之前的函数
+                save_plot_to_s3(fig_tissue, s3, bucket, f"{plot_prefix}/tissue.png")
+
+                # 4.2 遍历 31 个蛋白质绘图 (Protein + mRNA)
+                for p_name in protein_names:
+                    # 绘制 Protein (plasma)
+                    fig_p = _plot_spatial_expr(adata_out, p_name, None, None)
+                    save_plot_to_s3(fig_p, s3, bucket, f"{plot_prefix}/protein_{p_name}.png")
+
+                    # 绘制 mRNA (viridis)
+                    if p_name in adata_in.var_names:
+                        fig_m = _plot_spatial_expr_mrna(adata_in, p_name, None, None)
+                    else:
+                        fig_m = _plot_image_placeholder(IMAGE_NA_PATH)
+                    save_plot_to_s3(fig_m, s3, bucket, f"{plot_prefix}/mrna_{p_name}.png")
+
+                # 4.3 预渲染 Leiden 聚类图 (使用固定参数)
+                # Protein resolutions: 0.3, 0.4, 0.5, 0.6
+                for res in [0.3, 0.4, 0.5, 0.6]:
+                    fig, ax = plt.subplots(figsize=(4.8, 4.8))
+                    # n_neighbors 设置为 15 (Scanpy 默认，0 是无效的)
+                    _plot_leiden_clustering(adata_out, ax=ax, n_neighbors=15, resolution=res,
+                                            title=f"Protein Res {res}")
+                    save_plot_to_s3(fig, s3, bucket, f"{plot_prefix}/leiden_prot_{res}.png")
+
+                # mRNA resolutions: 0.8, 0.9, 1.0, 1.1
+                for res in [0.8, 0.9, 1.0, 1.1]:
+                    fig, ax = plt.subplots(figsize=(4.8, 4.8))
+                    _plot_leiden_clustering(adata_in, ax=ax, n_neighbors=15, resolution=res, title=f"mRNA Res {res}")
+                    save_plot_to_s3(fig, s3, bucket, f"{plot_prefix}/leiden_mrna_{res}.png")
 
                 # 4. 上传结果 (task_{code}/output.h5ad)
                 local_out = f"out_{task.feature_code}.h5ad"
                 adata_out.write_h5ad(local_out)
                 output_key = f"task_{task.feature_code}/output.h5ad"
                 s3.upload_file(local_out, bucket, output_key)
-                s3.upload_file(local_in, bucket, f"task_{task.feature_code}/input_preprocessed.h5ad")
+                s3.upload_file(adata_in, bucket, f"task_{task.feature_code}/input_preprocessed.h5ad")
 
                 # 5. 更新状态并发送邮件
                 task.output_path = output_key
@@ -104,23 +158,19 @@ def run_worker():
                 session.commit()
                 send_notification(task.email, task.feature_code, success=True)
 
-
                 # 清理本地临时文件
                 if os.path.exists(local_in): os.remove(local_in)
                 if os.path.exists(local_out): os.remove(local_out)
 
             except Exception as e:
                 print(f"Error processing {task.feature_code}: {e}")
-                # 标记失败并回滚其他可能的更改
                 session.rollback()
                 task.status = 'failed'
                 session.commit()
 
-                # 发送带有详细错误信息的通知
                 send_notification(task.email, task.feature_code, success=False, note=str(e))
 
         session.close()
-        # 轮询间隔：如果有任务则快速进入下一轮，没任务休眠10秒
         time.sleep(10 if not task else 1)
 
 
