@@ -7,24 +7,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import socket
-import resend
-
-# --- 配置初始化 ---
-#
-# def force_ipv4():
-#     # 获取原本的 getaddrinfo
-#     old_getaddrinfo = socket.getaddrinfo
-#
-#     # 定义新的解析函数
-#     def new_getaddrinfo(*args, **kwargs):
-#         responses = old_getaddrinfo(*args, **kwargs)
-#         # 过滤结果，只保留 IPv4 (AF_INET)
-#         return [response for response in responses if response[0] == socket.AF_INET]
-#
-#     # 覆盖系统函数
-#     socket.getaddrinfo = new_getaddrinfo
-#
-# force_ipv4()
+import requests
 
 Base = declarative_base()
 
@@ -148,34 +131,118 @@ def get_s3_client():
 # #
 # import os
 # import resend
-
-
 def send_notification(email, code, success=True, note=''):
-    # 从环境变量获取 API Key
-    resend.api_key = os.getenv("RESEND_API_KEY")
+    # 从环境变量获取配置
+    api_key = os.getenv("BREVO_API_KEY")
+    sender_email = os.getenv("SENDER_EMAIL")  # 必须是你在 Brevo 验证过的邮箱
 
+    if not api_key or not sender_email:
+        print("Brevo config missing")
+        return
+
+    # 准备邮件内容
     subject = "DGAT Imputation Finished" if success else "DGAT Failed"
+    status_color = "green" if success else "red"
+    status_text = "Success" if success else "Failed"
 
-
-    html_body = f"""
-    <p>Status: <strong>{'Success' if success else 'Failed'}</strong></p>
-    <p>Your feature code is: <strong>{code}</strong></p>
-    <p>Note: {note}</p>
+    # HTML 内容（可以写得很漂亮）
+    html_content = f"""
+    <html>
+    <body>
+        <h2>DGAT Task Notification</h2>
+        <p>Status: <strong style="color: {status_color};">{status_text}</strong></p>
+        <p>Your feature code is: <strong>{code}</strong></p>
+        <p>Note: {note}</p>
+        <hr>
+        <p style="font-size: 12px; color: gray;">Sent from DGAT System</p>
+    </body>
+    </html>
     """
 
-    try:
-        # 发送邮件
-        # 如果你没有配置域名，from 必须填: onboarding@resend.dev
-        # to 必须填: 你注册 resend 时的邮箱 (仅测试模式限制)
-        params = {
-            "from": "DGAT Notifier <onboarding@resend.dev>",
-            "to": [email],
-            "subject": subject,
-            "html": html_body
-        }
+    # Brevo API 地址
+    url = "https://api.brevo.com/v3/smtp/email"
 
-        email_req = resend.Emails.send(params)
-        print(f"Email sent successfully! ID: {email_req['id']}")
+    # 请求头
+    headers = {
+        "accept": "application/json",
+        "api-key": api_key,
+        "content-type": "application/json"
+    }
+
+    # 请求体
+    payload = {
+        "sender": {"name": "DGAT System", "email": sender_email},
+        "to": [{"email": email}],  # 这里的 email 可以是任何真实用户的邮箱
+        "subject": subject,
+        "htmlContent": html_content
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+
+        if response.status_code == 201:
+            print(f"Email sent successfully to {email}")
+        else:
+            # 打印错误详情以便调试
+            print(f"Brevo Error: {response.status_code} - {response.text}")
 
     except Exception as e:
-        print(f"Resend API Error: {e}")
+        print(f"Network Error: {e}")
+#
+# def send_notification(email, code, success=True, note=''):
+#     # 从环境变量获取配置
+#     api_key = os.getenv("BREVO_API_KEY")
+#     sender_email = os.getenv("SENDER_EMAIL")  # 必须是你在 Brevo 验证过的邮箱
+#
+#     if not api_key or not sender_email:
+#         print("Brevo config missing")
+#         return
+#
+#     # 准备邮件内容
+#     subject = "DGAT Imputation Finished" if success else "DGAT Failed"
+#     status_color = "green" if success else "red"
+#     status_text = "Success" if success else "Failed"
+#
+#     # HTML 内容（可以写得很漂亮）
+#     html_content = f"""
+#     <html>
+#     <body>
+#         <h2>DGAT Task Notification</h2>
+#         <p>Status: <strong style="color: {status_color};">{status_text}</strong></p>
+#         <p>Your feature code is: <strong>{code}</strong></p>
+#         <p>Note: {note}</p>
+#         <hr>
+#         <p style="font-size: 12px; color: gray;">Sent from DGAT System</p>
+#     </body>
+#     </html>
+#     """
+#
+#     # Brevo API 地址
+#     url = "https://api.brevo.com/v3/smtp/email"
+#
+#     # 请求头
+#     headers = {
+#         "accept": "application/json",
+#         "api-key": api_key,
+#         "content-type": "application/json"
+#     }
+#
+#     # 请求体
+#     payload = {
+#         "sender": {"name": "DGAT System", "email": sender_email},
+#         "to": [{"email": email}],  # 这里的 email 可以是任何真实用户的邮箱
+#         "subject": subject,
+#         "htmlContent": html_content
+#     }
+#
+#     try:
+#         response = requests.post(url, json=payload, headers=headers, timeout=10)
+#
+#         if response.status_code == 201:
+#             print(f"Email sent successfully to {email}")
+#         else:
+#             # 打印错误详情以便调试
+#             print(f"Brevo Error: {response.status_code} - {response.text}")
+#
+#     except Exception as e:
+#         print(f"Network Error: {e}")
