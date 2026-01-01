@@ -41,27 +41,58 @@ def get_s3_client():
         region_name="auto"
     )
 
-def send_notification(email, code, success=True, note = ''):
+# def send_notification(email, code, success=True, note = ''):
+#     subject = "DGAT Imputation Finished" if success else "DGAT Failed"
+#     body = f"\nYour feature code is：{code}\nPlease go to the website -> Your Results to check the result."
+#     if not success:
+#         body = f"Your task failed during processing, please check the file format."
+#         if note:
+#             body += f"\nError info: {note}"
+#
+#     msg = MIMEText(body)
+#     msg['Subject'] = subject
+#     msg['From'] = os.getenv("SMTP_USER")
+#     msg['To'] = email
+#
+#     try:
+#         # 1. 使用 587 端口建立普通 SMTP 连接
+#         server = smtplib.SMTP('smtp.gmail.com', 587, timeout=30)
+#         # 2. 将连接升级为加密连接 (必须)
+#         server.starttls()
+#         # 3. 登录并发送
+#         server.login('carlwanghy@gmail.com', 'oilucthfcbwrykjf')
+#         server.send_message(msg)
+#         server.quit()
+#     except Exception as e:
+#         print(f"Mail Error: {e}")
+
+
+def send_notification(email, code, success=True, note=''):
     subject = "DGAT Imputation Finished" if success else "DGAT Failed"
-    body = f"\nYour feature code is：{code}\nPlease go to the website -> Your Results to check the result."
-    if not success:
-        body = f"Your task failed during processing, please check the file format."
-        if note:
-            body += f"\nError info: {note}"
+    body = f"Your feature code is: {code}\n..."
 
     msg = MIMEText(body)
     msg['Subject'] = subject
     msg['From'] = os.getenv("SMTP_USER")
     msg['To'] = email
 
+    smtp_server = os.getenv("SMTP_SERVER")
+    smtp_port = int(os.getenv("SMTP_PORT", 587))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASS")
+
     try:
-        # 1. 使用 587 端口建立普通 SMTP 连接
-        server = smtplib.SMTP('smtp.gmail.com', 587, timeout=30)
-        # 2. 将连接升级为加密连接 (必须)
-        server.starttls()
-        # 3. 登录并发送
-        server.login('carlwanghy@gmail.com', 'oilucthfcbwrykjf')
+        # 如果是 587 端口，必须使用以下逻辑
+        if smtp_port == 587:
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()  # 关键：升级为安全连接
+        else:
+            # 如果是 465 端口，直接使用 SSL
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+
+        server.login(smtp_user, smtp_pass)
         server.send_message(msg)
         server.quit()
+        print(f"Email sent to {email}")
     except Exception as e:
         print(f"Mail Error: {e}")

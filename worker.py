@@ -27,6 +27,19 @@ def save_plot_to_s3(fig, s3_client, bucket, key):
     plt.close(fig)
 
 
+def save_plot_to_s3(fig, s3_client, bucket, key):
+    img_data = io.BytesIO()
+    fig.savefig(img_data, format='png', bbox_inches='tight', dpi=100)
+    img_data.seek(0)
+    # 关键点：使用 upload_fileobj 处理内存中的数据流
+    s3_client.upload_fileobj(
+        img_data,
+        bucket,
+        key,
+        ExtraArgs={'ContentType': 'image/png'}
+    )
+    plt.close(fig)  # 释放内存
+
 def cleanup_old_tasks():
     """清理48小时前的数据：包括存储桶文件和数据库记录"""
     print(f"[{datetime.now()}] Running cleanup: checking for tasks older than 48 hours...")
@@ -92,14 +105,14 @@ def run_worker():
 
         if task:
             try:
-                # 1. 锁定任务
                 task.status = 'running'
                 session.commit()
                 print(f"Processing Task: {task.feature_code}")
 
-                # 2. 从 Bucket 下载
                 s3 = get_s3_client()
                 bucket = os.getenv("BUCKET_NAME")
+
+                # 2. 下载
                 local_in = f"tmp_{task.feature_code}.h5ad"
                 s3.download_file(bucket, task.input_path, local_in)
 
@@ -107,28 +120,32 @@ def run_worker():
                 adata_in = ad.read_h5ad(local_in)
                 adata_out = web_predict(URL_REPO, adata_in)
 
-                s3 = get_s3_client()
-                bucket = os.getenv("BUCKET_NAME")
                 plot_prefix = f"task_{task.feature_code}/spatial_plots"
-
                 print(f"Generating plots for {task.feature_code}...")
 
                 # 4.1 绘制 Tissue 基准图
-                fig_tissue = _plot_tissue_only(adata_out, None, None)  # 使用你之前的函数
-                save_plot_to_s3(fig_tissue, s3, bucket, f"{plot_prefix}/tissue.png")
+                try:
+                    fig_tissue = _plot_tissue_only(adata_out, None, None)
+                    save_plot_to_s3(fig_tissue, s3, bucket, f"{plot_prefix}/tissue.png")
+                except Exception as e:
+                    print(f"Tissue plot failed: {e}")
 
-                # 4.2 遍历 31 个蛋白质绘图 (Protein + mRNA)
+                # 4.2 遍历 31 个蛋白质绘图
                 for p_name in protein_names:
-                    # 绘制 Protein (plasma)
-                    fig_p = _plot_spatial_expr(adata_out, p_name, None, None)
-                    save_plot_to_s3(fig_p, s3, bucket, f"{plot_prefix}/protein_{p_name}.png")
+                    try:
+                        p_name = p_name.strip()
+                        # 绘制 Protein
+                        fig_p = _plot_spatial_expr(adata_out, p_name, None, None)
+                        save_plot_to_s3(fig_p, s3, bucket, f"{plot_prefix}/protein_{p_name}.png")
 
-                    # 绘制 mRNA (viridis)
-                    if p_name in adata_in.var_names:
-                        fig_m = _plot_spatial_expr_mrna(adata_in, p_name, None, None)
-                    else:
-                        fig_m = _plot_image_placeholder()
-                    save_plot_to_s3(fig_m, s3, bucket, f"{plot_prefix}/mrna_{p_name}.png")
+                        # 绘制 mRNA
+                        if p_name in adata_in.var_names:
+                            fig_m = _plot_spatial_expr_mrna(adata_in, p_name, None, None)
+                        else:
+                            fig_m = _plot_image_placeholder(f"{p_name}\nNot in mRNA")
+                        save_plot_to_s3(fig_m, s3, bucket, f"{plot_prefix}/mrna_{p_name}.png")
+                    except Exception as e:
+                        print(f"Plotting skipped for {p_name} due to: {e}")
 
                 # 4.3 预渲染 Leiden 聚类图 (使用固定参数)
                 # Protein resolutions: 0.3, 0.4, 0.5, 0.6
@@ -145,33 +162,39 @@ def run_worker():
                     _plot_leiden_clustering(adata_in, ax=ax, n_neighbors=15, resolution=res, title=f"mRNA Res {res}")
                     save_plot_to_s3(fig, s3, bucket, f"{plot_prefix}/leiden_mrna_{res}.png")
 
-                # 4. 上传结果 (task_{code}/output.h5ad)
                 local_out = f"out_{task.feature_code}.h5ad"
                 adata_out.write_h5ad(local_out)
-                output_key = f"task_{task.feature_code}/output.h5ad"
-                s3.upload_file(local_out, bucket, output_key)
-                s3.upload_file(adata_in, bucket, f"task_{task.feature_code}/input_preprocessed.h5ad")
 
-                # 5. 更新状态并发送邮件
-                task.output_path = output_key
+                # --- 【关键修复点 1】: adata_in 也需要写入本地再上传 ---
+                local_in_pre = f"pre_{task.feature_code}.h5ad"
+                adata_in.write_h5ad(local_in_pre)
+
+                s3.upload_file(local_out, bucket, f"task_{task.feature_code}/output.h5ad")
+                s3.upload_file(local_in_pre, bucket, f"task_{task.feature_code}/input_preprocessed.h5ad")
+
+                # 6. 更新状态
+                task.output_path = f"task_{task.feature_code}/output.h5ad"
                 task.status = 'completed'
                 session.commit()
+
+                # 发送通知
                 send_notification(task.email, task.feature_code, success=True)
 
-                # 清理本地临时文件
-                if os.path.exists(local_in): os.remove(local_in)
-                if os.path.exists(local_out): os.remove(local_out)
+                # 7. 清理所有本地临时文件
+                for f in [local_in, local_out, local_in_pre]:
+                    if os.path.exists(f): os.remove(f)
 
             except Exception as e:
+                import traceback
+                traceback.print_exc()  # 打印详细堆栈到 Railway 日志
                 print(f"Error processing {task.feature_code}: {e}")
                 session.rollback()
                 task.status = 'failed'
                 session.commit()
-
                 send_notification(task.email, task.feature_code, success=False, note=str(e))
 
-        session.close()
-        time.sleep(10 if not task else 1)
+            session.close()
+            time.sleep(10 if not task else 1)
 
 
 if __name__ == "__main__":
