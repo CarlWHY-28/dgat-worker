@@ -437,30 +437,59 @@ def _plot_spatial_expr(adata, gene: Optional[str], library_id: Optional[str], im
     # fallback scatter
     return _plot_scatter_expr(adata, gene)
 
+
 def _plot_leiden_clustering(
-    adata,
-    ax,
-    n_neighbors = 10,
-    resolution = 0.5,
-    title = None,
-    seed = 0
-    ):
-    sc.pp.neighbors(adata, n_neighbors = n_neighbors, use_rep = 'X', random_state = seed)
-    sc.tl.leiden(adata, resolution = resolution, random_state = seed)
+        adata,
+        ax,
+        n_neighbors=10,
+        resolution=0.5,
+        title=None,
+        seed=0
+):
+    import matplotlib.pyplot as plt
+    import scanpy as sc
+    import squidpy as sq
+
+    # 1. 计算
+    sc.pp.neighbors(adata, n_neighbors=n_neighbors, use_rep='X', random_state=seed)
+    sc.tl.leiden(adata, resolution=resolution, random_state=seed)
+
     if 'leiden_colors' in adata.uns.keys():
         adata.uns.pop('leiden_colors')
+
+    # 2. 绘图
     try:
-        sq.pl.spatial_scatter(adata, color = "leiden", title = title, ax = ax)
-    except Exception:
-        #使用散点图，不用sc或者sq绘图
+        # 注意：sq.pl.spatial_scatter 默认可能会直接 show，在 worker 中要确保它画在 ax 上
+        sq.pl.spatial_scatter(adata, color="leiden", title=title, ax=ax)
+    except Exception as e:
+        print(f"Squidpy plotting failed, falling back to manual scatter: {e}")
+        # 使用散点图手动绘制
         coords = adata.obsm["spatial"]
         leiden_labels = adata.obs["leiden"].astype(str)
-        unique_labels = leiden_labels.unique()
-        colors = plt.cm.get_cmap('tab20', len(unique_labels))
+        unique_labels = sorted(leiden_labels.unique())  # 排序使颜色固定
+
+        # 修复 get_cmap 弃用问题，使用更稳健的写法
+        cmap = plt.get_cmap('tab20')
+        colors = [cmap(i % 20) for i in range(len(unique_labels))]
+
         for i, label in enumerate(unique_labels):
             mask = leiden_labels == label
-            ax.scatter(coords[mask, 0], coords[mask, 1], s=20, color=colors(i), label=label)
-        ax.set_title(title if title else "Leiden Clustering")
+            ax.scatter(
+                coords[mask, 0],
+                coords[mask, 1],
+                s=10,
+                color=colors[i],
+                label=label,
+                edgecolors='none'
+            )
 
+        ax.set_title(title if title else f"Leiden (res={resolution})")
+        # --- 关键修复：显式创建图例 ---
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), markerscale=2)
 
-    ax.get_legend().set_title("Leiden cluster")
+    # 3. 关键修复：安全性检查
+    legend = ax.get_legend()
+    if legend:
+        legend.set_title("Leiden cluster")
+    else:
+        print("Warning: No legend could be generated for this plot.")
