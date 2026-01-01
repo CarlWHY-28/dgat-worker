@@ -100,7 +100,7 @@ def send_notification(email, code, success=True, note=''):
     try:
         # 如果是 587 端口，必须使用以下逻辑
         if smtp_port == 587:
-            server = smtplib.SMTP(smtp_server, smtp_port)
+            server = smtplib.SMTP(smtp_server, smtp_port, timeout=60)
             server.starttls()  # 关键：升级为安全连接
         else:
             # 如果是 465 端口，直接使用 SSL
