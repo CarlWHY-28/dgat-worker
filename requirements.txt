@@ -1,0 +1,42 @@
+# ===== UI =====
+streamlit==1.38.0
+rich==13.9.4
+
+numpy==1.25.2
+scipy==1.13.1
+pandas==2.2.2
+matplotlib==3.8.4
+seaborn==0.13.2
+pillow==10.4.0
+tqdm==4.66.5
+gdown==5.2.0
+anndata==0.11.3
+scanpy==1.11.2
+h5py==3.10.0
+pyvis==0.3.2
+squidpy==1.6.5
+
+scikit-learn==1.4.2
+
+# ===== PyTorch (CPU only) =====
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.3.1+cpu
+torchvision==0.18.1+cpu
+torchaudio==2.3.1+cpu
+-f https://data.pyg.org/whl/torch-2.3.1+cpu.html
+torch_geometric==2.5.3
+torch_scatter==2.1.2
+torch_sparse==0.6.18
+pyg_lib==0.4.0
+
+python-igraph==0.11.5
+leidenalg==0.10.2
+
+# 数据库核心
+sqlalchemy
+pymysql  # MySQL 驱动
+cryptography # 处理安全连接
+
+# 存储与任务
+boto3
+python-dotenv
