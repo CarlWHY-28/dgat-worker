@@ -7,22 +7,24 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import socket
+import resend
+
 # --- 配置初始化 ---
-
-def force_ipv4():
-    # 获取原本的 getaddrinfo
-    old_getaddrinfo = socket.getaddrinfo
-
-    # 定义新的解析函数
-    def new_getaddrinfo(*args, **kwargs):
-        responses = old_getaddrinfo(*args, **kwargs)
-        # 过滤结果，只保留 IPv4 (AF_INET)
-        return [response for response in responses if response[0] == socket.AF_INET]
-
-    # 覆盖系统函数
-    socket.getaddrinfo = new_getaddrinfo
-
-force_ipv4()
+#
+# def force_ipv4():
+#     # 获取原本的 getaddrinfo
+#     old_getaddrinfo = socket.getaddrinfo
+#
+#     # 定义新的解析函数
+#     def new_getaddrinfo(*args, **kwargs):
+#         responses = old_getaddrinfo(*args, **kwargs)
+#         # 过滤结果，只保留 IPv4 (AF_INET)
+#         return [response for response in responses if response[0] == socket.AF_INET]
+#
+#     # 覆盖系统函数
+#     socket.getaddrinfo = new_getaddrinfo
+#
+# force_ipv4()
 
 Base = declarative_base()
 
@@ -112,33 +114,68 @@ def get_s3_client():
 #         print(f"Email sent to {email}")
 #     except Exception as e:
 #         print(f"Mail Error: {e}")
+#
+# def send_notification(email, code, success=True, note=''):
+#     subject = "DGAT Imputation Finished" if success else "DGAT Failed"
+#     body = f"Your feature code is: {code}\n{note}"
+#
+#     msg = MIMEText(body)
+#     msg['Subject'] = subject
+#     msg['From'] = os.getenv("SMTP_USER")
+#     msg['To'] = email
+#
+#     # Gmail 配置
+#     smtp_server = "smtp.gmail.com"
+#     # 强烈建议使用 465 (SSL)，比 587 更稳定
+#     smtp_port = 465
+#
+#     smtp_user = os.getenv("SMTP_USER")
+#     smtp_pass = os.getenv("SMTP_PASS")
+#
+#     try:
+#         # 使用 SMTP_SSL 直接连接 465 端口
+#         # 注意：这里不需要再调用 starttls()，因为连接建立时已经是加密的了
+#         server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=60)
+#
+#         server.login(smtp_user, smtp_pass)
+#         server.send_message(msg)
+#         server.quit()
+#         print(f"Email sent successfully to {email}")
+#
+#     except Exception as e:
+#         print(f"Mail Error: {e}")
+#
+# #
+# import os
+# import resend
+
 
 def send_notification(email, code, success=True, note=''):
+    # 从环境变量获取 API Key
+    resend.api_key = os.getenv("RESEND_API_KEY")
+
     subject = "DGAT Imputation Finished" if success else "DGAT Failed"
-    body = f"Your feature code is: {code}\n{note}"
 
-    msg = MIMEText(body)
-    msg['Subject'] = subject
-    msg['From'] = os.getenv("SMTP_USER")
-    msg['To'] = email
 
-    # Gmail 配置
-    smtp_server = "smtp.gmail.com"
-    # 强烈建议使用 465 (SSL)，比 587 更稳定
-    smtp_port = 465
-
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_pass = os.getenv("SMTP_PASS")
+    html_body = f"""
+    <p>Status: <strong>{'Success' if success else 'Failed'}</strong></p>
+    <p>Your feature code is: <strong>{code}</strong></p>
+    <p>Note: {note}</p>
+    """
 
     try:
-        # 使用 SMTP_SSL 直接连接 465 端口
-        # 注意：这里不需要再调用 starttls()，因为连接建立时已经是加密的了
-        server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=60)
+        # 发送邮件
+        # 如果你没有配置域名，from 必须填: onboarding@resend.dev
+        # to 必须填: 你注册 resend 时的邮箱 (仅测试模式限制)
+        params = {
+            "from": "DGAT Notifier <onboarding@resend.dev>",
+            "to": [email],
+            "subject": subject,
+            "html": html_body
+        }
 
-        server.login(smtp_user, smtp_pass)
-        server.send_message(msg)
-        server.quit()
-        print(f"Email sent successfully to {email}")
+        email_req = resend.Emails.send(params)
+        print(f"Email sent successfully! ID: {email_req['id']}")
 
     except Exception as e:
-        print(f"Mail Error: {e}")
+        print(f"Resend API Error: {e}")

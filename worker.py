@@ -15,22 +15,7 @@ matplotlib.use('Agg') # 必须在导入 pyplot 之前
 import matplotlib.pyplot as plt
 import io
 
-import socket
 
-def force_ipv4():
-    # 获取原本的 getaddrinfo
-    old_getaddrinfo = socket.getaddrinfo
-
-    # 定义新的解析函数
-    def new_getaddrinfo(*args, **kwargs):
-        responses = old_getaddrinfo(*args, **kwargs)
-        # 过滤结果，只保留 IPv4 (AF_INET)
-        return [response for response in responses if response[0] == socket.AF_INET]
-
-    # 覆盖系统函数
-    socket.getaddrinfo = new_getaddrinfo
-
-force_ipv4()
 
 
 URL_REPO = 'https://raw.githubusercontent.com/CarlWHY-28/DGAT-web-resource/main'

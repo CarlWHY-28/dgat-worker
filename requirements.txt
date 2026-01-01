@@ -39,4 +39,4 @@ cryptography # 处理安全连接
 # 存储与任务
 boto3
 python-dotenv
-
+resend
