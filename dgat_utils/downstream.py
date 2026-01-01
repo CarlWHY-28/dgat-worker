@@ -318,7 +318,7 @@ def _plot_spatial_expr_scanpy(adata, gene: str, library_id: Optional[str], img_k
     except Exception:
         return None
 
-def _plot_scatter_expr(adata, gene: Optional[str]) -> plt.Figure:
+def _plot_scatter_expr(adata, gene: Optional[str],cmap = 'plasma') -> plt.Figure:
     fig = plt.figure(figsize=FIGSIZE)
     if not _has_spatial_coords(adata) or gene is None or str(gene) not in _varnames(adata):
         plt.axis("off")
@@ -327,7 +327,7 @@ def _plot_scatter_expr(adata, gene: Optional[str]) -> plt.Figure:
 
     coords = adata.obsm["spatial"]
     vals = _to_1d_vals(adata, gene)
-    sca = plt.scatter(coords[:, 0], coords[:, 1], s=20, c=vals)
+    sca = plt.scatter(coords[:, 0], coords[:, 1], s=20, c=vals, cmap=cmap)
     #plt.gca().invert_yaxis()
     plt.xticks([]); plt.yticks([])
     plt.colorbar(sca, shrink=0.75).set_label(str(gene))
@@ -404,7 +404,7 @@ def _plot_spatial_expr_mrna(adata, gene: Optional[str], library_id: Optional[str
         except Exception:
             plt.close(fig)
 
-    return _plot_scatter_expr(adata, gene)
+    return _plot_scatter_expr(adata, gene,cmap='viridis')
 
 
 def _plot_spatial_expr(adata, gene: Optional[str], library_id: Optional[str], img_key: Optional[str]) -> plt.Figure:
