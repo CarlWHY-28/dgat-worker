@@ -16,7 +16,11 @@ def cleanup_old_tasks():
     bucket_name = os.getenv("BUCKET_NAME")
 
     # 1. 计算48小时前的时间点
-    threshold_time = datetime.utcnow() - timedelta(hours=48)
+
+    # !!!!!!!!现在是测试所以是1 ！！！！！！************************
+
+
+    threshold_time = datetime.utcnow() - timedelta(hours=1)
 
     # 2. 查询过期的任务
     old_tasks = session.query(ProteinTask).filter(ProteinTask.created_at < threshold_time).all()
