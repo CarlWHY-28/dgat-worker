@@ -333,17 +333,21 @@ def _plot_scatter_expr(adata, gene: Optional[str]) -> plt.Figure:
     plt.colorbar(sca, shrink=0.75).set_label(str(gene))
     return fig
 
-def _plot_image_placeholder(img_path: str) -> plt.Figure:
-    fig = plt.figure(figsize=FIGSIZE)
-    try:
-        img = plt.imread(img_path)
-        plt.imshow(img)
-        plt.axis("off")
-    except Exception:
-        plt.axis("off")
-        plt.text(0.5, 0.5, "NA", ha="center", va="center", fontsize=16)
-    return fig
 
+
+
+def _plot_image_placeholder(text="N/A"):
+    """
+    核心修复：不再读取本地 png 文件，直接用代码画一张 NA 图。
+    这样就不会再报 'Filename must be a string' 的错误。
+    """
+    fig, ax = plt.subplots(figsize=FIGSIZE)
+    ax.text(0.5, 0.5, text,
+            ha='center', va='center',
+            fontsize=24, color='gray',
+            fontweight='bold')
+    ax.axis('off')
+    return fig
 
 def _plot_tissue_only(adata, library_id: Optional[str], img_key: Optional[str]) -> plt.Figure:
     fig, ax = plt.subplots(figsize=FIGSIZE, dpi=100)

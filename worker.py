@@ -127,7 +127,7 @@ def run_worker():
                     if p_name in adata_in.var_names:
                         fig_m = _plot_spatial_expr_mrna(adata_in, p_name, None, None)
                     else:
-                        fig_m = _plot_image_placeholder(IMAGE_NA_PATH)
+                        fig_m = _plot_image_placeholder()
                     save_plot_to_s3(fig_m, s3, bucket, f"{plot_prefix}/mrna_{p_name}.png")
 
                 # 4.3 预渲染 Leiden 聚类图 (使用固定参数)
