@@ -90,6 +90,7 @@ def run_worker():
                 adata_in = ad.read_h5ad(local_in)
                 adata_out = web_predict(URL_REPO, adata_in)
 
+
                 # 4. 上传结果 (task_{code}/output.h5ad)
                 local_out = f"out_{task.feature_code}.h5ad"
                 adata_out.write_h5ad(local_out)
@@ -101,6 +102,12 @@ def run_worker():
                 task.status = 'completed'
                 session.commit()
                 send_notification(task.email, task.feature_code, success=True)
+
+                # 6. 把adata_in(这里是预处理过的)保存到s3备用
+                local_in_pre = f"pre_{task.feature_code}.h5ad"
+                s3.upload_file(local_in, bucket, f"task_{task.feature_code}/input_preprocessed.h5ad")
+
+
 
                 # 清理本地临时文件
                 if os.path.exists(local_in): os.remove(local_in)
