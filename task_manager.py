@@ -6,8 +6,24 @@ from sqlalchemy import create_engine, Column, String, DateTime, Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
-
+import socket
 # --- 配置初始化 ---
+
+def force_ipv4():
+    # 获取原本的 getaddrinfo
+    old_getaddrinfo = socket.getaddrinfo
+
+    # 定义新的解析函数
+    def new_getaddrinfo(*args, **kwargs):
+        responses = old_getaddrinfo(*args, **kwargs)
+        # 过滤结果，只保留 IPv4 (AF_INET)
+        return [response for response in responses if response[0] == socket.AF_INET]
+
+    # 覆盖系统函数
+    socket.getaddrinfo = new_getaddrinfo
+
+force_ipv4()
+
 Base = declarative_base()
 
 # 数据库连接：处理 Railway 的 mysql:// 格式mysql://root:jdakpxILhrVFxpLzuSxCjXlZFluTLGAR@mysql.railway.internal:3306/railway
