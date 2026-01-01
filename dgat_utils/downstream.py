@@ -456,7 +456,6 @@ def _plot_leiden_clustering(
 
     if 'leiden_colors' in adata.uns.keys():
         adata.uns.pop('leiden_colors')
-
     # 2. 绘图
     try:
         # 注意：sq.pl.spatial_scatter 默认可能会直接 show，在 worker 中要确保它画在 ax 上
