@@ -96,17 +96,13 @@ def run_worker():
                 adata_out.write_h5ad(local_out)
                 output_key = f"task_{task.feature_code}/output.h5ad"
                 s3.upload_file(local_out, bucket, output_key)
+                s3.upload_file(local_in, bucket, f"task_{task.feature_code}/input_preprocessed.h5ad")
 
                 # 5. 更新状态并发送邮件
                 task.output_path = output_key
                 task.status = 'completed'
                 session.commit()
                 send_notification(task.email, task.feature_code, success=True)
-
-                # 6. 把adata_in(这里是预处理过的)保存到s3备用
-                local_in_pre = f"pre_{task.feature_code}.h5ad"
-                s3.upload_file(local_in, bucket, f"task_{task.feature_code}/input_preprocessed.h5ad")
-
 
 
                 # 清理本地临时文件

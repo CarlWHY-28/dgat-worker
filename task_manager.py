@@ -56,7 +56,7 @@ def send_notification(email, code, success=True, note = ''):
     msg['To'] = email
 
     try:
-        with smtplib.SMTP_SSL(os.getenv("SMTP_SERVER"), int(os.getenv("SMTP_PORT", 465))) as server:
+        with smtplib.SMTP_SSL(os.getenv("SMTP_SERVER"), int(os.getenv("SMTP_PORT", 587))) as server:
             server.login(os.getenv("SMTP_USER"), os.getenv("SMTP_PASS"))
             server.send_message(msg)
     except Exception as e:
