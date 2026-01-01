@@ -407,6 +407,7 @@ def _plot_spatial_expr_mrna(adata, gene: Optional[str], library_id: Optional[str
     return _plot_scatter_expr(adata, gene,cmap='viridis')
 
 
+
 def _plot_spatial_expr(adata, gene: Optional[str], library_id: Optional[str], img_key: Optional[str]) -> plt.Figure:
     fig, ax = plt.subplots(figsize=FIGSIZE, dpi=100)
     if gene is None or str(gene) not in _varnames(adata):
