@@ -15,6 +15,7 @@ scanpy==1.11.2
 h5py==3.10.0
 pyvis==0.3.2
 squidpy==1.6.5
+socket
 
 scikit-learn==1.4.2
 
