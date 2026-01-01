@@ -8,7 +8,7 @@ import requests
 from task_manager import Session, ProteinTask, get_s3_client, send_notification
 from dgat_utils.predict_util import web_predict
 
-from dgat_utils.downstream import _plot_leiden_clustering, _plot_spatial_expr, _plot_spatial_expr_mrna, _plot_tissue_only, _plot_image_placeholder, IMAGE_NA_PATH
+from dgat_utils.downstream import _plot_leiden_clustering, _plot_spatial_expr, _plot_spatial_expr_mrna, _plot_tissue_only, _plot_image_placeholder, IMAGE_NA_PATH, _probe_spatial_meta
 
 import matplotlib
 matplotlib.use('Agg') # 必须在导入 pyplot 之前
@@ -124,6 +124,9 @@ def run_worker():
                 print(f"Generating plots for {task.feature_code}...")
 
                 # 4.1 绘制 Tissue 基准图
+
+                has_img, lib_id, img_k, meta = _probe_spatial_meta(adata_out)
+                #print(f"[{task.feature_code}] Spatial detect: has_img={has_img}, lib_id={lib_id}, img_key={img_k}")
                 try:
                     fig_tissue = _plot_tissue_only(adata_out, None, None)
                     save_plot_to_s3(fig_tissue, s3, bucket, f"{plot_prefix}/tissue.png")
@@ -135,12 +138,12 @@ def run_worker():
                     try:
                         p_name = p_name.strip()
                         # 绘制 Protein
-                        fig_p = _plot_spatial_expr(adata_out, p_name, None, None)
+                        fig_p = _plot_spatial_expr(adata_out, p_name, lib_id, img_k)
                         save_plot_to_s3(fig_p, s3, bucket, f"{plot_prefix}/protein_{p_name}.png")
 
                         # 绘制 mRNA
                         if p_name in adata_in.var_names:
-                            fig_m = _plot_spatial_expr_mrna(adata_in, p_name, None, None)
+                            fig_m = _plot_spatial_expr_mrna(adata_in, p_name, lib_id, img_k)
                         else:
                             fig_m = _plot_image_placeholder(f"{p_name}\nNot in mRNA")
                         save_plot_to_s3(fig_m, s3, bucket, f"{plot_prefix}/mrna_{p_name}.png")
