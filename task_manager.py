@@ -10,8 +10,9 @@ from datetime import datetime
 # --- 配置初始化 ---
 Base = declarative_base()
 
-# 数据库连接：处理 Railway 的 mysql:// 格式
-db_url = os.getenv("MYSQL_URL", "mysql+pymysql://root:password@localhost:3306/railway")
+# 数据库连接：处理 Railway 的 mysql:// 格式mysql://root:jdakpxILhrVFxpLzuSxCjXlZFluTLGAR@mysql.railway.internal:3306/railway
+
+db_url = os.getenv("MYSQL_URL", "mysql://root:jdakpxILhrVFxpLzuSxCjXlZFluTLGAR@mysql.railway.internal:3306/railway")
 if db_url.startswith("mysql://"):
     db_url = db_url.replace("mysql://", "mysql+pymysql://", 1)
 
