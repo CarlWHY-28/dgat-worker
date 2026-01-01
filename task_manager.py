@@ -42,11 +42,13 @@ def get_s3_client():
         region_name="auto"
     )
 
-def send_notification(email, code, success=True):
+def send_notification(email, code, success=True, note = ''):
     subject = "DGAT 推理任务完成通知" if success else "DGAT 推理任务失败"
     body = f"您的任务已处理完成！\n取件码为：{code}\n请前往网站输入此码查询结果。"
     if not success:
         body = f"抱歉，任务 {code} 处理过程中出现错误，请检查文件格式。"
+        if note:
+            body += f"\n错误信息：{note}"
 
     msg = MIMEText(body)
     msg['Subject'] = subject

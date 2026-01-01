@@ -49,6 +49,10 @@ def run_worker():
             except Exception as e:
                 print(f"Error processing {task.feature_code}: {e}")
                 task.status = 'failed'
+                #把错误信息发送给用户
+                send_notification(task.email, task.feature_code, success=False, note=str(e))
+
+
                 session.commit()
                 send_notification(task.email, task.feature_code, success=False)
 
