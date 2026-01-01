@@ -196,6 +196,12 @@ def run_worker():
             session.close()
             time.sleep(10 if not task else 1)
 
+        else:
+            session.close()
+            time.sleep(10)
+
+
+
 
 if __name__ == "__main__":
     run_worker()
