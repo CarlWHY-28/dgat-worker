@@ -8,7 +8,7 @@ import requests
 from task_manager import Session, ProteinTask, get_s3_client, send_notification
 from dgat_utils.predict_util import web_predict
 
-from dgat_utils.downstream import _plot_leiden_clustering, _plot_spatial_expr, _plot_spatial_expr_mrna, _plot_tissue_only, _plot_image_placeholder, IMAGE_NA_PATH, _probe_spatial_meta
+from dgat_utils.downstream import _plot_leiden_clustering, _plot_spatial_expr, _plot_spatial_expr_mrna, _plot_tissue_only, _plot_image_placeholder, IMAGE_NA_PATH, _probe_spatial_meta, compute_moran_single
 
 import matplotlib
 matplotlib.use('Agg') # 必须在导入 pyplot 之前
@@ -167,6 +167,19 @@ def run_worker():
 
                 local_out = f"out_{task.feature_code}.h5ad"
                 adata_out.write_h5ad(local_out)
+
+                moran_df, moran_stats = moran_df, moran_stats = compute_moran_single(
+                    adata_out,
+                    adata_in,
+                    tissue_name="Current Sample",
+                    coord_type="grid",
+                    n_perms=10
+                )
+                # 将结果保存并上传到 S3
+                csv_buf = io.StringIO()
+                moran_df.to_csv(csv_buf, index=False)
+                s3.put_object(Bucket=bucket, Key=f"task_{task.feature_code}/moran_statistics.csv",
+                              Body=csv_buf.getvalue())
 
                 # --- 【关键修复点 1】: adata_in 也需要写入本地再上传 ---
                 local_in_pre = f"pre_{task.feature_code}.h5ad"
