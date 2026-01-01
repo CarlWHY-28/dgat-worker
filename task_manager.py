@@ -19,7 +19,6 @@ if db_url.startswith("mysql://"):
 engine = create_engine(db_url, pool_recycle=3600)
 Session = sessionmaker(bind=engine)
 
-# --- 数据库模型 ---
 class ProteinTask(Base):
     __tablename__ = 'protein_tasks'
     feature_code = Column(String(36), primary_key=True)
@@ -43,12 +42,12 @@ def get_s3_client():
     )
 
 def send_notification(email, code, success=True, note = ''):
-    subject = "DGAT 推理任务完成通知" if success else "DGAT 推理任务失败"
-    body = f"您的任务已处理完成！\n取件码为：{code}\n请前往网站输入此码查询结果。"
+    subject = "DGAT Imputation Finished" if success else "DGAT Failed"
+    body = f"\nYour feature code is：{code}\nPlease go to the website -> Your Results to check the result."
     if not success:
-        body = f"抱歉，任务 {code} 处理过程中出现错误，请检查文件格式。"
+        body = f"Your task failed during processing, please check the file format."
         if note:
-            body += f"\n错误信息：{note}"
+            body += f"\nError info: {note}"
 
     msg = MIMEText(body)
     msg['Subject'] = subject
