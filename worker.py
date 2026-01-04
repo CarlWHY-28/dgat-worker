@@ -212,7 +212,7 @@ def run_worker():
                 session.commit()
 
                 # 发送通知
-                send_notification(task.email, task.feature_code, success=True, note=f"The number of missing genes: {missing_genes}" if missing_genes else "All genes present.")
+                send_notification(task.email, task.feature_code, success=True, note=f"The number of missing genes: {len(missing_genes)}.\n Missing genes:\n {missing_genes}" if missing_genes else "All genes present.")
 
                 # 7. 清理所有本地临时文件
                 for f in [local_in, local_out, local_in_pre]:
