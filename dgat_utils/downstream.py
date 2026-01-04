@@ -460,7 +460,7 @@ def _plot_leiden_clustering(
     # 2. 绘图
     try:
         # 注意：sq.pl.spatial_scatter 默认可能会直接 show，在 worker 中要确保它画在 ax 上
-        sc.pl.spatial(adata, color="leiden", ax=ax, show=False,title=title if title else f"Leiden (res={resolution})", size=10)
+        sc.pl.spatial(adata, color="leiden", ax=ax, show=False,title=title if title else f"Leiden (res={resolution})")
     except Exception as e:
         print(f"Squidpy plotting failed, falling back to manual scatter: {e}")
         # 使用散点图手动绘制

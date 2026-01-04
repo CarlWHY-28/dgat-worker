@@ -155,7 +155,7 @@ def run_worker():
 
                 # 4.3 预渲染 Leiden 聚类图 (使用固定参数)
                 # Protein resolutions: 0.3, 0.4, 0.5, 0.6
-                for res in [0.3, 0.4, 0.5, 0.6]:
+                for res in [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1]:
                     fig, ax = plt.subplots(figsize=(4.8, 4.8))
                     # n_neighbors 设置为 15 (Scanpy 默认，0 是无效的)
                     _plot_leiden_clustering(adata_out, ax=ax, n_neighbors=15, resolution=res,
@@ -163,7 +163,7 @@ def run_worker():
                     save_plot_to_s3(fig, s3, bucket, f"{plot_prefix}/leiden_prot_{res}.png")
 
                 # mRNA resolutions: 0.8, 0.9, 1.0, 1.1
-                for res in [0.8, 0.9, 1.0, 1.1]:
+                for res in [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1]:
                     fig, ax = plt.subplots(figsize=(4.8, 4.8))
                     _plot_leiden_clustering(adata_in, ax=ax, n_neighbors=15, resolution=res, title=f"mRNA Res {res}")
                     save_plot_to_s3(fig, s3, bucket, f"{plot_prefix}/leiden_mrna_{res}.png")
