@@ -40,19 +40,9 @@ def web_predict(url,adata):
     common_protein = requests.get(f"{url}/common_protein_31.txt").text.strip().splitlines()
     adata.var_names_make_unique()
     # Performs quality control and normalization on a Spatial Transcriptomics dataset.
+    adata,missing_genes = fill_genes(adata, common_gene)
     preprocess_ST(adata)
     # Ensures that the test dataset contains the same genes as the training dataset. Fills missing genes in the test data with zeros.
-    adata = fill_genes(adata, common_gene)
     pred_adata = protein_predict(adata, common_gene, common_protein, url, pyg_save_dir)
 
-    return pred_adata
-
-def test_Preprocessing(url,adata):
-    common_gene = requests.get(f"{url}/common_gene_11535.txt").text.strip().splitlines()
-
-    adata.var_names_make_unique()
-    # Performs quality control and normalization on a Spatial Transcriptomics dataset.
-    preprocess_ST(adata)
-    # Ensures that the test dataset contains the same genes as the training dataset. Fills missing genes in the test data with zeros.
-    adata = fill_genes(adata, common_gene)
-    return adata
+    return pred_adata,missing_genes

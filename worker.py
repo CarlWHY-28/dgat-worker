@@ -121,7 +121,7 @@ def run_worker():
 
                 # 3. 核心计算
                 adata_in = ad.read_h5ad(local_in)
-                adata_out = web_predict(URL_REPO, adata_in)
+                adata_out, missing_genes = web_predict(URL_REPO, adata_in)
 
                 plot_prefix = f"task_{task.feature_code}/spatial_plots"
                 print(f"Generating plots for {task.feature_code}...")
@@ -212,7 +212,7 @@ def run_worker():
                 session.commit()
 
                 # 发送通知
-                send_notification(task.email, task.feature_code, success=True)
+                send_notification(task.email, task.feature_code, success=True, note=f"The number of missing genes: {missing_genes}" if missing_genes else "All genes present.")
 
                 # 7. 清理所有本地临时文件
                 for f in [local_in, local_out, local_in_pre]:

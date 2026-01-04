@@ -205,7 +205,7 @@ def fill_genes(test_adata, common_gene):
         test_adata = adata[:, common_gene].copy()
     else:
         test_adata = test_adata[:, common_gene].copy()
-    return test_adata
+    return test_adata,missing_genes
 
 
 def preprocess_ST(adata):
