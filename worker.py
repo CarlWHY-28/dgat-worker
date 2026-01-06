@@ -121,15 +121,12 @@ def run_worker():
                 s3.download_file(bucket, task.input_path, local_in)
 
 
-                # 3. 核心计算
                 adata_in = ad.read_h5ad(local_in)
-                adata_origin = adata_in.copy()
+                adata_origin = ad.read_h5ad(local_in)
                 adata_out, missing_genes = web_predict(URL_REPO, adata_in)
 
                 plot_prefix = f"task_{task.feature_code}/spatial_plots"
                 print(f"Generating plots for {task.feature_code}...")
-
-                # 4.1 绘制 Tissue 基准图
 
                 has_img, lib_id, img_k, meta = _probe_spatial_meta(adata_out)
                 #print(f"[{task.feature_code}] Spatial detect: has_img={has_img}, lib_id={lib_id}, img_key={img_k}")
