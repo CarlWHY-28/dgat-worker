@@ -7,6 +7,7 @@ import requests
 
 from task_manager import Session, ProteinTask, get_s3_client, send_notification
 from dgat_utils.predict_util import web_predict
+from dgat_utils.utils.Preprocessing import preprocess_ST
 
 from dgat_utils.downstream import _plot_leiden_clustering, _plot_spatial_expr, _plot_spatial_expr_mrna, _plot_tissue_only, _plot_image_placeholder, IMAGE_NA_PATH, _probe_spatial_meta, compute_moran_single, compute_bivariate_moran_single
 
@@ -119,8 +120,10 @@ def run_worker():
                 local_in = f"tmp_{task.feature_code}.h5ad"
                 s3.download_file(bucket, task.input_path, local_in)
 
+
                 # 3. 核心计算
                 adata_in = ad.read_h5ad(local_in)
+                adata_origin = adata_in.copy()
                 adata_out, missing_genes = web_predict(URL_REPO, adata_in)
 
                 plot_prefix = f"task_{task.feature_code}/spatial_plots"
@@ -201,9 +204,11 @@ def run_worker():
 
                 # --- 【关键修复点 1】: adata_in 也需要写入本地再上传 ---
                 local_in_pre = f"pre_{task.feature_code}.h5ad"
-                adata_in.write_h5ad(local_in_pre)
+                preprocess_ST(adata_origin)
+                adata_origin.write_h5ad(local_in_pre)
 
                 s3.upload_file(local_out, bucket, f"task_{task.feature_code}/output.h5ad")
+
                 s3.upload_file(local_in_pre, bucket, f"task_{task.feature_code}/input_preprocessed.h5ad")
 
                 # 6. 更新状态
