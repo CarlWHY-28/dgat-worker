@@ -123,6 +123,7 @@ def run_worker():
 
                 adata_in = ad.read_h5ad(local_in)
                 adata_origin = ad.read_h5ad(local_in)
+                preprocess_ST(adata_origin)
                 adata_out, missing_genes = web_predict(URL_REPO, adata_in)
 
                 plot_prefix = f"task_{task.feature_code}/spatial_plots"
@@ -145,8 +146,8 @@ def run_worker():
                         save_plot_to_s3(fig_p, s3, bucket, f"{plot_prefix}/protein_{p_name}.png")
 
                         # 绘制 mRNA
-                        if p_name in adata_in.var_names:
-                            fig_m = _plot_spatial_expr_mrna(adata_in, p_name, lib_id, img_k)
+                        if p_name in adata_origin.var_names:
+                            fig_m = _plot_spatial_expr_mrna(adata_origin, p_name, lib_id, img_k)
                         else:
                             fig_m = _plot_image_placeholder(f"{p_name}\nNot in mRNA")
                         save_plot_to_s3(fig_m, s3, bucket, f"{plot_prefix}/mrna_{p_name}.png")
@@ -165,7 +166,7 @@ def run_worker():
                 # mRNA resolutions: 0.8, 0.9, 1.0, 1.1
                 for res in [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1]:
                     fig, ax = plt.subplots(figsize=(4.8, 4.8))
-                    _plot_leiden_clustering(adata_in, ax=ax, n_neighbors=15, resolution=res, title=f"mRNA Res {res}")
+                    _plot_leiden_clustering(adata_origin, ax=ax, n_neighbors=15, resolution=res, title=f"mRNA Res {res}")
                     save_plot_to_s3(fig, s3, bucket, f"{plot_prefix}/leiden_mrna_{res}.png")
 
                 local_out = f"out_{task.feature_code}.h5ad"
@@ -173,7 +174,7 @@ def run_worker():
 
                 moran_df, moran_stats = moran_df, moran_stats = compute_moran_single(
                     adata_out,
-                    adata_in,
+                    adata_origin,
                     tissue_name="Current Sample",
                     coord_type="grid",
                     n_perms=10
@@ -201,7 +202,7 @@ def run_worker():
 
                 # --- 【关键修复点 1】: adata_in 也需要写入本地再上传 ---
                 local_in_pre = f"pre_{task.feature_code}.h5ad"
-                preprocess_ST(adata_origin)
+
                 adata_origin.write_h5ad(local_in_pre)
 
                 s3.upload_file(local_out, bucket, f"task_{task.feature_code}/output.h5ad")
