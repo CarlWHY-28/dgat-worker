@@ -42,22 +42,23 @@ def save_plot_to_s3(fig, s3_client, bucket, key):
     )
     plt.close(fig)
 
+
 def cleanup_old_tasks():
     print(f"[{datetime.now()}] Running cleanup: checking for tasks older than 48 hours...")
     session = Session()
     s3 = get_s3_client()
     bucket_name = os.getenv("BUCKET_NAME")
 
-
     threshold_time = datetime.utcnow() - timedelta(hours=48)
 
-
-    old_tasks = session.query(ProteinTask).filter(ProteinTask.created_at < threshold_time).all()
+    old_tasks = session.query(ProteinTask).filter(
+        ProteinTask.created_at < threshold_time,
+        ProteinTask.status.in_(['completed', 'failed'])
+    ).all()
 
     for task in old_tasks:
         try:
-            print(f"Cleaning up task: {task.feature_code}")
-
+            print(f"Cleaning up S3 files for task: {task.feature_code}")
 
             prefix = f"task_{task.feature_code}/"
             objects_to_delete = s3.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
@@ -67,10 +68,12 @@ def cleanup_old_tasks():
                 s3.delete_objects(Bucket=bucket_name, Delete=delete_keys)
                 print(f"Deleted files for task {task.feature_code} from bucket.")
 
-            session.delete(task)
+            task.status = 'deleted'
+            task.output_path = None
 
         except Exception as e:
             print(f"Error cleaning up task {task.feature_code}: {e}")
+
 
     session.commit()
     session.close()
