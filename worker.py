@@ -196,7 +196,7 @@ def run_worker():
                 task.status = 'completed'
                 session.commit()
 
-                send_notification(task.email, task.feature_code, success=True, note=f"The number of missing genes: {len(missing_genes)}.\n Missing genes:\n {missing_genes}" if missing_genes else "All genes present.")
+                send_notification(task.email, task.feature_code, success=True, note=f"Gene lost: {missing_genes/protein_names * 100} %.\n Missing genes:\n {missing_genes}" if missing_genes else "All genes present.")
 
                 for f in [local_in, local_out, local_in_pre]:
                     if os.path.exists(f): os.remove(f)
