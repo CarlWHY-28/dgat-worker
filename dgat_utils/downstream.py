@@ -327,7 +327,7 @@ def _plot_scatter_expr(adata, gene: Optional[str],cmap = 'plasma') -> plt.Figure
 
     coords = adata.obsm["spatial"]
     vals = _to_1d_vals(adata, gene)
-    sca = plt.scatter(coords[:, 0], coords[:, 1], s=20, c=vals, cmap=cmap)
+    sca = plt.scatter(coords[:, 0], coords[:, 1], s=10, c=vals, cmap=cmap)
     #plt.gca().invert_yaxis()
     plt.xticks([]); plt.yticks([])
     plt.colorbar(sca, shrink=0.75).set_label(str(gene))
@@ -477,7 +477,7 @@ def _plot_leiden_clustering(
             ax.scatter(
                 coords[mask, 0],
                 coords[mask, 1],
-                s=20,
+                s=10,
                 color=colors[i],
                 label=label,
                 edgecolors='none'
