@@ -477,7 +477,7 @@ def _plot_leiden_clustering(
             ax.scatter(
                 coords[mask, 0],
                 coords[mask, 1],
-                s=10,
+                s=20,
                 color=colors[i],
                 label=label,
                 edgecolors='none'
